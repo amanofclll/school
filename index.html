@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Student Poster Generator</title>
+    <!-- Script required for converting HTML to Image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2c2f33;
+            font-family: 'Montserrat', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- CONTROL PANEL UI --- */
+        #controls {
+            width: 100%;
+            background-color: #1a1c1e;
+            padding: 20px;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        input[type="file"] {
+            padding: 8px;
+            background: #333;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            width: 170px;
+        }
+
+        button {
+            padding: 12px 18px;
+            background-color: #ea5c15;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 800;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #d14a0c; }
+        
+        .btn-print { background-color: #1a56b8; }
+        .btn-print:hover { background-color: #0f3b85; }
+
+        .btn-edit { background-color: #28a745; }
+        .btn-edit:hover { background-color: #1e7e34; }
+        .btn-edit.active { background-color: #dc3545; }
+
+        .btn-download { background-color: #9c27b0; }
+        .btn-download:hover { background-color: #7b1fa2; }
+
+        /* --- POSTER STYLES --- */
+        #output {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            padding: 40px 0;
+        }
+
+        .poster-container {
+            width: 1414px;
+            height: 2000px;
+            background-image: url('https://ik.imagekit.io/7pu8xl7bt/aman%20temp.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            background-color: #0b1e4c;
+            overflow: hidden;
+        }
+
+        .card-grid {
+            position: absolute;
+            top: 605px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1320px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px 25px; 
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 10px 14px 10px; 
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            /* ABSOLUTE LOCK: Strictly locking all dimensions to prevent any size or layout shifts */
+            box-sizing: border-box;
+            height: 360px;
+            max-height: 360px;
+            min-height: 360px;
+            width: 311px;
+            max-width: 311px;
+            min-width: 311px;
+            overflow: hidden;
+        }
+
+        /* INVISIBLE / WHITE PHOTO AREA */
+        .photo {
+            width: 118px; 
+            height: 118px; 
+            border-radius: 50%;
+            background-color: #ffffff;
+            margin-bottom: 24px; 
+            border: 3px solid #fff;
+            flex-shrink: 0; 
+        }
+
+        /* TEXT CONTAINERS */
+        .name-container {
+            width: 100%;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px; 
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        
+        .name {
+            color: #081d4a;
+            font-size: 24px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            line-height: 1.1;
+            white-space: normal;
+            outline: none;
+        }
+
+        .details-box {
+            display: flex;
+            background-color: #081d4a;
+            color: white;
+            width: 95%;
+            height: 48px; 
+            border-radius: 4px;
+            margin-bottom: 5px; 
+            flex-shrink: 0;
+        }
+        
+        .detail-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 2px;
+            overflow: hidden;
+        }
+        .border-right { border-right: 1.5px solid #ffffff; }
+        .label { font-size: 10px; letter-spacing: 0.5px; font-weight: 600; }
+        .value {
+            font-size: 13px; 
+            font-weight: 800;
+            margin-top: 4px;
+            text-transform: uppercase;
+            text-align: center;
+            white-space: nowrap;
+            outline: none;
+        }
+
+        .course-container {
+            width: 95%;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px; 
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .course {
+            color: #081d4a;
+            font-size: 19px;
+            font-weight: 900;
+            text-transform: uppercase;
+            white-space: nowrap;
+            outline: none;
+        }
+
+        .university-container {
+            background-color: #081d4a;
+            width: 95%;
+            height: 44px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 0 5px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        .university {
+            color: #ffc000;
+            font-size: 22px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            white-space: nowrap;
+            outline: none;
+        }
+
+        /* EDIT MODE STYLES */
+        .editable-text[contenteditable="true"] {
+            cursor: text;
+            transition: all 0.2s;
+        }
+        .editable-text[contenteditable="true"]:hover {
+            box-shadow: 0 0 0 2px rgba(234, 92, 21, 0.5);
+            border-radius: 2px;
+        }
+        .editable-text[contenteditable="true"]:focus {
+            box-shadow: 0 0 0 2px #ea5c15;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        /* FLOATING EDIT TOOLBAR */
+        #editToolbar {
+            display: none;
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: #1a1c1e;
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            z-index: 2000;
+            border: 2px solid #ea5c15;
+            text-align: center;
+        }
+        .toolbar-btn {
+            background-color: #ea5c15;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            font-size: 18px;
+            font-weight: 900;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .toolbar-btn:hover { background-color: #d14a0c; }
+
+        /* Loading Overlay for Image Generation */
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 900;
+            flex-direction: column;
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            @page { size: 1414px 2000px; margin: 0; }
+            body { background-color: transparent; margin: 0; padding: 0; }
+            #controls, #editToolbar { display: none !important; }
+            #output { padding: 0; gap: 0; }
+            .poster-container {
+                box-shadow: none;
+                page-break-after: always;
+                page-break-inside: avoid;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
+            }
+            .editable-text { box-shadow: none !important; background: transparent !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Control Panel -->
+    <div id="controls">
+        <div class="control-group">
+            <label style="font-size: 11px; font-weight: 800;">1. STUDENT CSV</label>
+            <input type="file" id="csvFileInput" accept=".csv" />
+        </div>
+        <button onclick="processCSV()">Generate Boards</button>
+        <button id="editToggleBtn" class="btn-edit" onclick="toggleEditMode()">Enable Edit Mode</button>
+        <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+        
+        <!-- Selective Download Input -->
+        <div style="display: flex; gap: 5px; align-items: center; background: #333; padding: 4px; border-radius: 5px;">
+            <input type="text" id="pageDownloadInput" placeholder="Page (e.g. 1 or all)" value="all" style="width: 130px; margin: 0; background: #222; border: none; text-align: center;" />
+            <button class="btn-download" onclick="downloadImages()" style="margin: 0;">Download HD</button>
+        </div>
+    </div>
+
+    <!-- Floating Resize Toolbar -->
+    <div id="editToolbar">
+        <div style="font-size: 14px; font-weight: 800; margin-bottom: 10px; color: #ea5c15;">EDIT MODE ACTIVE</div>
+        <div style="font-size: 12px; margin-bottom: 15px; max-width: 200px; margin-left: auto; margin-right: auto;">
+            Click any text on the boards to type. Use the buttons below to resize selected text.
+        </div>
+        <div>
+            <button class="toolbar-btn" onclick="resizeFocusedText(-1)">A -</button>
+            <button class="toolbar-btn" onclick="resizeFocusedText(1)">A +</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div>Generating HD Images...</div>
+        <div style="font-size: 14px; margin-top: 10px; font-weight: 400;">Please wait, this may take a moment.</div>
+    </div>
+
+    <!-- Output Container -->
+    <div id="output"></div>
+
+    <script>
+        let currentBgImage = "url('https://ik.imagekit.io/7pu8xl7bt/aman%20temp.png')";
+        let isEditMode = false;
+        let focusedElement = null;
+
+        document.addEventListener('focusin', function(e) {
+            if (isEditMode && e.target.classList.contains('editable-text')) {
+                focusedElement = e.target;
+            }
+        });
+
+        function toggleEditMode() {
+            const btn = document.getElementById('editToggleBtn');
+            const toolbar = document.getElementById('editToolbar');
+            const editableTexts = document.querySelectorAll('.editable-text');
+            
+            isEditMode = !isEditMode;
+            
+            if (isEditMode) {
+                btn.classList.add('active');
+                btn.innerText = "Disable Edit Mode";
+                toolbar.style.display = "block";
+                editableTexts.forEach(el => el.setAttribute('contenteditable', 'true'));
+            } else {
+                btn.classList.remove('active');
+                btn.innerText = "Enable Edit Mode";
+                toolbar.style.display = "none";
+                editableTexts.forEach(el => el.setAttribute('contenteditable', 'false'));
+                focusedElement = null;
+            }
+        }
+
+        function resizeFocusedText(direction) {
+            if (!focusedElement) {
+                alert("Please click on the text you want to resize first.");
+                return;
+            }
+            
+            let currentSize = window.getComputedStyle(focusedElement).fontSize;
+            let currentSizeNum = parseFloat(currentSize);
+            focusedElement.style.fontSize = (currentSizeNum + direction) + 'px';
+        }
+
+        function parseCSVRow(str) {
+            const arr = [];
+            let quote = false;
+            let val = '';
+            for (let c = 0; c < str.length; c++) {
+                let char = str[c], nextChar = str[c+1];
+                if (char === '"' && quote && nextChar === '"') {
+                    val += '"';
+                    c++;
+                } else if (char === '"') {
+                    quote = !quote;
+                } else if (char === ',' && !quote) {
+                    arr.push(val);
+                    val = '';
+                } else {
+                    val += char;
+                }
+            }
+            arr.push(val);
+            return arr.map(v => v.trim());
+        }
+
+        function processCSV() {
+            const fileInput = document.getElementById('csvFileInput');
+            if (fileInput.files.length === 0) {
+                alert("Please select a CSV file first.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const text = e.target.result.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const rows = text.split('\n');
+                
+                while(rows.length > 0 && rows[rows.length - 1].trim() === '') rows.pop();
+
+                if (rows.length < 2) {
+                    alert("The CSV file seems to be empty or missing data.");
+                    return;
+                }
+
+                const headers = parseCSVRow(rows[0]);
+
+                const nameIdx = headers.indexOf('Student Name');
+                const courseIdx = headers.indexOf('Course');
+                const uniIdx = headers.indexOf('University / College');
+                const centerIdx = headers.indexOf('Center');
+                const enrollIdx = headers.indexOf('Enrollment ID');
+                const rankIdx = headers.indexOf('Rank');
+
+                if (nameIdx === -1 || enrollIdx === -1) {
+                    alert("Could not find required columns in CSV (Make sure 'Student Name' and 'Enrollment ID' exist exactly as written).");
+                    return;
+                }
+
+                let students = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const rowText = rows[i];
+                    // Skip completely empty lines or lines with only commas
+                    if (rowText.trim() === '' || rowText.replace(/,/g, '').trim() === '') continue; 
+                    
+                    const cols = parseCSVRow(rowText);
+                    
+                    // Ensure the student actually has a name before adding them to prevent blank cards
+                    const parsedName = cols[nameIdx] ? cols[nameIdx].trim() : '';
+                    if (parsedName === '') continue;
+                    
+                    students.push({
+                        name: parsedName,
+                        enrollment: cols[enrollIdx] || '',
+                        center: cols[centerIdx] || '',
+                        course: cols[courseIdx] || '',
+                        university: cols[uniIdx] || '',
+                        rank: rankIdx !== -1 ? (cols[rankIdx] || '') : '' 
+                    });
+                }
+
+                // SORTING LOGIC
+                students.sort((a, b) => {
+                    const valA = a.rank.trim().toLowerCase();
+                    const valB = b.rank.trim().toLowerCase();
+
+                    function getSortCategory(val) {
+                        if (val === "" || val === "na") return 3; 
+                        if (val === "selected") return 2; 
+                        
+                        const num = parseInt(val.replace(/\D/g, ''), 10);
+                        if (!isNaN(num)) return 1; 
+                        
+                        return 3; 
+                    }
+
+                    const catA = getSortCategory(valA);
+                    const catB = getSortCategory(valB);
+
+                    if (catA !== catB) {
+                        return catA - catB;
+                    }
+
+                    if (catA === 1 && catB === 1) {
+                        const numA = parseInt(valA.replace(/\D/g, ''), 10);
+                        const numB = parseInt(valB.replace(/\D/g, ''), 10);
+                        return numA - numB;
+                    }
+
+                    return 0; 
+                });
+
+                generatePosters(students);
+            };
+
+            reader.readAsText(file);
+        }
+
+        function generatePosters(students) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = ''; 
+            
+            if(isEditMode) toggleEditMode();
+
+            for (let i = 0; i < students.length; i += 12) {
+                const chunk = students.slice(i, i + 12);
+                const posterNode = createPosterElement(chunk, Math.floor(i / 12) + 1);
+                outputDiv.appendChild(posterNode);
+            }
+
+            setTimeout(autoResizeText, 100);
+        }
+
+        function createPosterElement(studentsBatch, pageNumber) {
+            const container = document.createElement('div');
+            container.className = 'poster-container';
+            container.id = `poster-page-${pageNumber}`;
+            container.style.backgroundImage = currentBgImage;
+
+            const grid = document.createElement('div');
+            grid.className = 'card-grid';
+
+            studentsBatch.forEach((student) => {
+                const cardHtml = `
+                    <div class="card">
+                        <div class="photo"></div>
+                        
+                        <div class="name-container">
+                            <span class="name auto-fit-text editable-text">${student.name}</span>
+                        </div>
+                        
+                        <div class="details-box">
+                            <div class="detail-col border-right">
+                                <span class="label">ENROLLMENT</span>
+                                <span class="value editable-text">${student.enrollment || '-'}</span>
+                            </div>
+                            <div class="detail-col">
+                                <span class="label">CENTRE</span>
+                                <span class="value editable-text">${student.center || '-'}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="course-container">
+                            <span class="course auto-fit-text editable-text">${student.course || '-'}</span>
+                        </div>
+
+                        <div class="university-container">
+                            <span class="university auto-fit-text editable-text">${student.university || '-'}</span>
+                        </div>
+                    </div>
+                `;
+                
+                grid.insertAdjacentHTML('beforeend', cardHtml);
+            });
+
+            container.appendChild(grid);
+            return container;
+        }
+
+        function autoResizeText() {
+            const textElements = document.querySelectorAll('.auto-fit-text');
+            
+            textElements.forEach(el => {
+                const parent = el.parentElement;
+                let fontSize = parseFloat(window.getComputedStyle(el).fontSize);
+                const minFontSize = 10; 
+                
+                while ((el.scrollWidth > parent.clientWidth || el.scrollHeight > parent.clientHeight) && fontSize > minFontSize) {
+                    fontSize -= 0.5;
+                    el.style.fontSize = fontSize + 'px';
+                }
+            });
+        }
+
+        // --- HIGH QUALITY + EXACT RESOLUTION IMAGE DOWNLOAD FEATURE ---
+        async function downloadImages() {
+            const allContainers = Array.from(document.querySelectorAll('.poster-container'));
+            if (allContainers.length === 0) {
+                alert("Please generate the boards first.");
+                return;
+            }
+
+            const pageInput = document.getElementById('pageDownloadInput').value.trim().toLowerCase();
+            let targets = [];
+
+            if (pageInput === 'all') {
+                targets = allContainers;
+            } else {
+                const pageNum = parseInt(pageInput, 10);
+                if (isNaN(pageNum) || pageNum < 1 || pageNum > allContainers.length) {
+                    alert(`Invalid page number. Please enter a number between 1 and ${allContainers.length}, or 'all'.`);
+                    return;
+                }
+                targets = [allContainers[pageNum - 1]];
+            }
+
+            if (isEditMode) {
+                toggleEditMode();
+            }
+
+            window.scrollTo(0, 0);
+            await document.fonts.ready;
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            for (let i = 0; i < targets.length; i++) {
+                const container = targets[i];
+                const actualPageNum = container.id.replace('poster-page-', '');
+                
+                try {
+                    const highResCanvas = await html2canvas(container, {
+                        scale: 2, 
+                        useCORS: true, 
+                        allowTaint: true,
+                        backgroundColor: "#0b1e4c",
+                        logging: false
+                    });
+                    
+                    const finalCanvas = document.createElement('canvas');
+                    finalCanvas.width = 1414;
+                    finalCanvas.height = 2000;
+                    
+                    const ctx = finalCanvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(highResCanvas, 0, 0, 1414, 2000);
+                    
+                    const link = document.createElement('a');
+                    link.download = `Student_Rankers_Page_${actualPageNum}.png`;
+                    link.href = finalCanvas.toDataURL('image/png', 1.0);
+                    link.click();
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500)); 
+                } catch (err) {
+                    console.error("Error generating image: ", err);
+                }
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'none';
+            alert("Download complete!");
+        }
+    </script>
+</body>
+</html>
