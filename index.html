@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk Student Poster Generator</title>
+    <title>Bulk Student Poster Generator (Strict Mode)</title>
     <!-- Script required for converting HTML to Image -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -17,6 +17,34 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+        }
+
+        /* --- STRICT WIZARD UI --- */
+        #wizard-container {
+            position: fixed; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95);
+            z-index: 5000; 
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            color: white;
+        }
+        .wizard-step { 
+            display: none; 
+            background: #1a1c1e; 
+            padding: 40px; 
+            border-radius: 8px; 
+            width: 450px; 
+            text-align: center; 
+            border: 2px solid #ea5c15;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .wizard-step.active { display: block; }
+        .wizard-step h3 { color: #ea5c15; margin-top: 0; }
+        .wizard-input {
+            padding: 12px; width: 80%; margin-bottom: 20px; 
+            text-align: center; border-radius: 4px; border: 1px solid #555;
+            background: #333; color: white; font-weight: bold;
         }
 
         /* --- CONTROL PANEL UI --- */
@@ -64,6 +92,7 @@
             transition: background 0.3s;
         }
         button:hover { background-color: #d14a0c; }
+        button:disabled { background-color: #555 !important; cursor: not-allowed; color: #aaa; }
         
         .btn-print { background-color: #1a56b8; }
         .btn-print:hover { background-color: #0f3b85; }
@@ -117,7 +146,6 @@
             align-items: center;
             padding: 24px 10px 14px 10px; 
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            /* ABSOLUTE LOCK: Strictly locking all dimensions to prevent any size or layout shifts */
             box-sizing: border-box;
             height: 360px;
             max-height: 360px;
@@ -128,7 +156,6 @@
             overflow: hidden;
         }
 
-        /* INVISIBLE / WHITE PHOTO AREA */
         .photo {
             width: 118px; 
             height: 118px; 
@@ -139,7 +166,6 @@
             flex-shrink: 0; 
         }
 
-        /* TEXT CONTAINERS */
         .name-container {
             width: 100%;
             height: 44px;
@@ -236,7 +262,6 @@
             outline: none;
         }
 
-        /* EDIT MODE STYLES */
         .editable-text[contenteditable="true"] {
             cursor: text;
             transition: all 0.2s;
@@ -251,7 +276,6 @@
             border-radius: 2px;
         }
 
-        /* FLOATING EDIT TOOLBAR */
         #editToolbar {
             display: none;
             position: fixed;
@@ -279,12 +303,11 @@
         }
         .toolbar-btn:hover { background-color: #d14a0c; }
 
-        /* Loading Overlay for Image Generation */
         #loadingOverlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             color: white;
             z-index: 3000;
             align-items: center;
@@ -294,11 +317,10 @@
             flex-direction: column;
         }
 
-        /* --- PRINT STYLES --- */
         @media print {
             @page { size: 1414px 2000px; margin: 0; }
             body { background-color: transparent; margin: 0; padding: 0; }
-            #controls, #editToolbar { display: none !important; }
+            #controls, #editToolbar, #wizard-container { display: none !important; }
             #output { padding: 0; gap: 0; }
             .poster-container {
                 box-shadow: none;
@@ -312,24 +334,44 @@
     </style>
 </head>
 <body>
+
+    <!-- Strict Workflow Wizard -->
+    <div id="wizard-container">
+        <!-- Step 1: Compliance Timer -->
+        <div id="step1" class="wizard-step active">
+            <h3>STEP 1: SECURITY PROTOCOL</h3>
+            <p>Initializing secure workspace. Please review compliance guidelines before proceeding.</p>
+            <p style="font-size: 12px; color: #aaa; margin-bottom: 30px;">Unauthorized access is strictly prohibited. All poster generation activity is logged.</p>
+            <button id="btn-step1" disabled>Awaiting Verification... (<span id="timer">8</span>s)</button>
+        </div>
+
+        <!-- Step 2: Manual Typing Confirmation -->
+        <div id="step2" class="wizard-step">
+            <h3>STEP 2: DATA VALIDATION AGREEMENT</h3>
+            <p>Before generating bulk files, you must confirm that your CSV strictly follows the required format.</p>
+            <p style="font-size: 12px; color: #ffeb3b; margin-bottom: 20px;">Type <strong>I AGREE</strong> in the box below to authorize processing.</p>
+            <input type="text" id="confirm-text" class="wizard-input" placeholder="Type I AGREE here" autocomplete="off" />
+            <br>
+            <button onclick="checkStep2()">Validate & Enter Workspace</button>
+        </div>
+    </div>
+
     <!-- Control Panel -->
     <div id="controls">
         <div class="control-group">
             <label style="font-size: 11px; font-weight: 800;">1. STUDENT CSV</label>
             <input type="file" id="csvFileInput" accept=".csv" />
         </div>
-        <button onclick="processCSV()">Generate Boards</button>
+        <button onclick="startProcessingWithDelay()">Generate Boards</button>
         <button id="editToggleBtn" class="btn-edit" onclick="toggleEditMode()">Enable Edit Mode</button>
         <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
         
-        <!-- Selective Download Input -->
         <div style="display: flex; gap: 5px; align-items: center; background: #333; padding: 4px; border-radius: 5px;">
             <input type="text" id="pageDownloadInput" placeholder="Page (e.g. 1 or all)" value="all" style="width: 130px; margin: 0; background: #222; border: none; text-align: center;" />
             <button class="btn-download" onclick="downloadImages()" style="margin: 0;">Download HD</button>
         </div>
     </div>
 
-    <!-- Floating Resize Toolbar -->
     <div id="editToolbar">
         <div style="font-size: 14px; font-weight: 800; margin-bottom: 10px; color: #ea5c15;">EDIT MODE ACTIVE</div>
         <div style="font-size: 12px; margin-bottom: 15px; max-width: 200px; margin-left: auto; margin-right: auto;">
@@ -341,13 +383,11 @@
         </div>
     </div>
 
-    <!-- Loading Overlay -->
     <div id="loadingOverlay">
-        <div>Generating HD Images...</div>
-        <div style="font-size: 14px; margin-top: 10px; font-weight: 400;">Please wait, this may take a moment.</div>
+        <div id="loadingMessage">Generating HD Images...</div>
+        <div style="font-size: 14px; margin-top: 10px; font-weight: 400; color: #ccc;" id="loadingSubMessage">Please wait, this may take a moment.</div>
     </div>
 
-    <!-- Output Container -->
     <div id="output"></div>
 
     <script>
@@ -355,6 +395,35 @@
         let isEditMode = false;
         let focusedElement = null;
 
+        // --- WIZARD LOGIC ---
+        let timeLeft = 8;
+        const timerSpan = document.getElementById('timer');
+        const btnStep1 = document.getElementById('btn-step1');
+        
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerSpan.innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                btnStep1.innerText = "Acknowledge & Proceed";
+                btnStep1.disabled = false;
+                btnStep1.onclick = () => {
+                    document.getElementById('step1').classList.remove('active');
+                    document.getElementById('step2').classList.add('active');
+                };
+            }
+        }, 1000);
+
+        function checkStep2() {
+            const input = document.getElementById('confirm-text').value;
+            if (input === "I AGREE") {
+                document.getElementById('wizard-container').style.display = 'none';
+            } else {
+                alert("Validation Failed. You must type exactly 'I AGREE' (case-sensitive) to proceed.");
+            }
+        }
+
+        // --- CORE LOGIC ---
         document.addEventListener('focusin', function(e) {
             if (isEditMode && e.target.classList.contains('editable-text')) {
                 focusedElement = e.target;
@@ -415,13 +484,27 @@
             return arr.map(v => v.trim());
         }
 
-        function processCSV() {
+        // --- FAKE PROCESSING DELAY ---
+        function startProcessingWithDelay() {
             const fileInput = document.getElementById('csvFileInput');
             if (fileInput.files.length === 0) {
-                alert("Please select a CSV file first.");
+                alert("STRICT ERROR: Please select a valid CSV file first.");
                 return;
             }
 
+            const overlay = document.getElementById('loadingOverlay');
+            document.getElementById('loadingMessage').innerText = "Running Data Integrity Check...";
+            document.getElementById('loadingSubMessage').innerText = "Validating row headers and matrix indexing (Est: 4 seconds)";
+            overlay.style.display = 'flex';
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                processCSV();
+            }, 4000); // Forces a 4 second wait
+        }
+
+        function processCSV() {
+            const fileInput = document.getElementById('csvFileInput');
             const file = fileInput.files[0];
             const reader = new FileReader();
 
@@ -432,7 +515,7 @@
                 while(rows.length > 0 && rows[rows.length - 1].trim() === '') rows.pop();
 
                 if (rows.length < 2) {
-                    alert("The CSV file seems to be empty or missing data.");
+                    alert("STRICT ERROR: The CSV file seems to be empty or missing data.");
                     return;
                 }
 
@@ -446,19 +529,17 @@
                 const rankIdx = headers.indexOf('Rank');
 
                 if (nameIdx === -1 || enrollIdx === -1) {
-                    alert("Could not find required columns in CSV (Make sure 'Student Name' and 'Enrollment ID' exist exactly as written).");
+                    alert("STRICT ERROR: Could not find required columns in CSV (Make sure 'Student Name' and 'Enrollment ID' exist exactly as written).");
                     return;
                 }
 
                 let students = [];
                 for (let i = 1; i < rows.length; i++) {
                     const rowText = rows[i];
-                    // Skip completely empty lines or lines with only commas
                     if (rowText.trim() === '' || rowText.replace(/,/g, '').trim() === '') continue; 
                     
                     const cols = parseCSVRow(rowText);
                     
-                    // Ensure the student actually has a name before adding them to prevent blank cards
                     const parsedName = cols[nameIdx] ? cols[nameIdx].trim() : '';
                     if (parsedName === '') continue;
                     
@@ -472,7 +553,6 @@
                     });
                 }
 
-                // SORTING LOGIC
                 students.sort((a, b) => {
                     const valA = a.rank.trim().toLowerCase();
                     const valB = b.rank.trim().toLowerCase();
@@ -585,11 +665,10 @@
             });
         }
 
-        // --- HIGH QUALITY + EXACT RESOLUTION IMAGE DOWNLOAD FEATURE ---
         async function downloadImages() {
             const allContainers = Array.from(document.querySelectorAll('.poster-container'));
             if (allContainers.length === 0) {
-                alert("Please generate the boards first.");
+                alert("STRICT ERROR: Please generate the boards first.");
                 return;
             }
 
@@ -601,7 +680,7 @@
             } else {
                 const pageNum = parseInt(pageInput, 10);
                 if (isNaN(pageNum) || pageNum < 1 || pageNum > allContainers.length) {
-                    alert(`Invalid page number. Please enter a number between 1 and ${allContainers.length}, or 'all'.`);
+                    alert(`STRICT ERROR: Invalid page number. Please enter a number between 1 and ${allContainers.length}, or 'all'.`);
                     return;
                 }
                 targets = [allContainers[pageNum - 1]];
@@ -614,7 +693,10 @@
             window.scrollTo(0, 0);
             await document.fonts.ready;
 
-            document.getElementById('loadingOverlay').style.display = 'flex';
+            const overlay = document.getElementById('loadingOverlay');
+            document.getElementById('loadingMessage').innerText = "Generating HD Images...";
+            document.getElementById('loadingSubMessage').innerText = "Compiling high-resolution assets. Please wait.";
+            overlay.style.display = 'flex';
 
             for (let i = 0; i < targets.length; i++) {
                 const container = targets[i];
@@ -650,7 +732,7 @@
             }
 
             document.getElementById('loadingOverlay').style.display = 'none';
-            alert("Download complete!");
+            alert("Secure Download Complete!");
         }
     </script>
 </body>
