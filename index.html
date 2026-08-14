@@ -1,738 +1,805 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk Student Poster Generator (Strict Mode)</title>
-    <!-- Script required for converting HTML to Image -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <title>Student Data Explorer - Master Edition</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap');
-        
+        :root {
+            --primary-teal: #00796B;
+            --primary-hover: #004D40;
+            --secondary-bg: #f0f7f6;
+            --gradient-bg: linear-gradient(135deg, #004D40 0%, #00796B 100%);
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --danger: #d32f2f;
+            --warning: #f57c00;
+            --success: #388e3c;
+        }
+
         body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--gradient-bg);
+            color: #333;
             margin: 0;
-            padding: 0;
-            background-color: #2c2f33;
-            font-family: 'Montserrat', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 40px 20px;
+            min-height: 100vh;
         }
 
-        /* --- STRICT WIZARD UI --- */
-        #wizard-container {
-            position: fixed; 
-            top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.95);
-            z-index: 5000; 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            color: white;
-        }
-        .wizard-step { 
-            display: none; 
-            background: #1a1c1e; 
-            padding: 40px; 
-            border-radius: 8px; 
-            width: 450px; 
-            text-align: center; 
-            border: 2px solid #ea5c15;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        }
-        .wizard-step.active { display: block; }
-        .wizard-step h3 { color: #ea5c15; margin-top: 0; }
-        .wizard-input {
-            padding: 12px; width: 80%; margin-bottom: 20px; 
-            text-align: center; border-radius: 4px; border: 1px solid #555;
-            background: #333; color: white; font-weight: bold;
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            max-width: 1450px;
+            margin: 0 auto;
         }
 
-        /* --- CONTROL PANEL UI --- */
-        #controls {
-            width: 100%;
-            background-color: #1a1c1e;
-            padding: 20px;
-            color: white;
+        .header-controls {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 15px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
+            gap: 20px;
+            margin-bottom: 20px;
         }
-        
-        .control-group {
+
+        h2 { margin: 0; color: #1a1a1a; font-weight: 600; font-size: 26px; }
+
+        .input-group { display: flex; gap: 10px; align-items: center; }
+
+        input[type="file"], input[type="text"], select, textarea {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: var(--primary-teal);
+            box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.2);
+        }
+
+        .global-search { width: 350px; }
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--primary-teal);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
-            flex-direction: column;
+            align-items: center;
             gap: 5px;
         }
 
-        input[type="file"] {
-            padding: 8px;
-            background: #333;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            font-size: 12px;
-            width: 170px;
-        }
-
-        button {
-            padding: 12px 18px;
-            background-color: #ea5c15;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-weight: 800;
-            cursor: pointer;
-            font-size: 13px;
-            transition: background 0.3s;
-        }
-        button:hover { background-color: #d14a0c; }
-        button:disabled { background-color: #555 !important; cursor: not-allowed; color: #aaa; }
+        button:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-1px); }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; transform: none; }
         
-        .btn-print { background-color: #1a56b8; }
-        .btn-print:hover { background-color: #0f3b85; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary-teal); color: var(--primary-teal); }
+        .btn-outline:hover:not(:disabled) { background: var(--secondary-bg); color: var(--primary-hover); }
+        .btn-danger { background-color: var(--warning); }
+        .btn-danger:hover:not(:disabled) { background-color: var(--danger); }
+        .btn-success { background-color: var(--success); }
 
-        .btn-edit { background-color: #28a745; }
-        .btn-edit:hover { background-color: #1e7e34; }
-        .btn-edit.active { background-color: #dc3545; }
-
-        .btn-download { background-color: #9c27b0; }
-        .btn-download:hover { background-color: #7b1fa2; }
-
-        /* --- POSTER STYLES --- */
-        #output {
-            display: flex;
-            flex-direction: column;
-            gap: 40px;
-            padding: 40px 0;
+        .status-badge {
+            font-size: 13px; padding: 6px 12px; background: #e0f2f1;
+            color: var(--primary-teal); border-radius: 20px; font-weight: 600; display: none;
         }
 
-        .poster-container {
-            width: 1414px;
-            height: 2000px;
-            background-image: url('https://ik.imagekit.io/7pu8xl7bt/aman%20temp.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            position: relative;
-            box-sizing: border-box;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            background-color: #0b1e4c;
-            overflow: hidden;
-        }
-
-        .card-grid {
-            position: absolute;
-            top: 605px; 
-            left: 50%;
-            transform: translateX(-50%);
-            width: 1320px;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 24px 25px; 
-        }
-
-        .card {
-            background-color: #ffffff;
+        /* Tools Panels */
+        .tools-panel {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
             border-radius: 12px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 24px 10px 14px 10px; 
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            box-sizing: border-box;
-            height: 360px;
-            max-height: 360px;
-            min-height: 360px;
-            width: 311px;
-            max-width: 311px;
-            min-width: 311px;
-            overflow: hidden;
-        }
-
-        .photo {
-            width: 118px; 
-            height: 118px; 
-            border-radius: 50%;
-            background-color: #ffffff;
-            margin-bottom: 24px; 
-            border: 3px solid #fff;
-            flex-shrink: 0; 
-        }
-
-        .name-container {
-            width: 100%;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 5px; 
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        
-        .name {
-            color: #081d4a;
-            font-size: 24px;
-            font-weight: 900;
-            text-transform: uppercase;
-            text-align: center;
-            line-height: 1.1;
-            white-space: normal;
-            outline: none;
-        }
-
-        .details-box {
-            display: flex;
-            background-color: #081d4a;
-            color: white;
-            width: 95%;
-            height: 48px; 
-            border-radius: 4px;
-            margin-bottom: 5px; 
-            flex-shrink: 0;
-        }
-        
-        .detail-col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 4px 2px;
-            overflow: hidden;
-        }
-        .border-right { border-right: 1.5px solid #ffffff; }
-        .label { font-size: 10px; letter-spacing: 0.5px; font-weight: 600; }
-        .value {
-            font-size: 13px; 
-            font-weight: 800;
-            margin-top: 4px;
-            text-transform: uppercase;
-            text-align: center;
-            white-space: nowrap;
-            outline: none;
-        }
-
-        .course-container {
-            width: 95%;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 5px; 
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        .course {
-            color: #081d4a;
-            font-size: 19px;
-            font-weight: 900;
-            text-transform: uppercase;
-            white-space: nowrap;
-            outline: none;
-        }
-
-        .university-container {
-            background-color: #081d4a;
-            width: 95%;
-            height: 44px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            padding: 0 5px;
-            box-sizing: border-box;
-            flex-shrink: 0;
-        }
-        .university {
-            color: #ffc000;
-            font-size: 22px;
-            font-weight: 900;
-            text-transform: uppercase;
-            text-align: center;
-            white-space: nowrap;
-            outline: none;
-        }
-
-        .editable-text[contenteditable="true"] {
-            cursor: text;
-            transition: all 0.2s;
-        }
-        .editable-text[contenteditable="true"]:hover {
-            box-shadow: 0 0 0 2px rgba(234, 92, 21, 0.5);
-            border-radius: 2px;
-        }
-        .editable-text[contenteditable="true"]:focus {
-            box-shadow: 0 0 0 2px #ea5c15;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-        }
-
-        #editToolbar {
-            display: none;
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background-color: #1a1c1e;
-            color: white;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            z-index: 2000;
-            border: 2px solid #ea5c15;
-            text-align: center;
-        }
-        .toolbar-btn {
-            background-color: #ea5c15;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 8px 15px;
-            font-size: 18px;
-            font-weight: 900;
-            cursor: pointer;
-            margin: 0 5px;
-        }
-        .toolbar-btn:hover { background-color: #d14a0c; }
-
-        #loadingOverlay {
+            margin-bottom: 20px;
             display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            color: white;
-            z-index: 3000;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            font-weight: 900;
-            flex-direction: column;
+            animation: fadeIn 0.3s ease;
         }
 
-        @media print {
-            @page { size: 1414px 2000px; margin: 0; }
-            body { background-color: transparent; margin: 0; padding: 0; }
-            #controls, #editToolbar, #wizard-container { display: none !important; }
-            #output { padding: 0; gap: 0; }
-            .poster-container {
-                box-shadow: none;
-                page-break-after: always;
-                page-break-inside: avoid;
-                -webkit-print-color-adjust: exact; 
-                print-color-adjust: exact;
-            }
-            .editable-text { box-shadow: none !important; background: transparent !important; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .tools-panel h3 { margin-top: 0; font-size: 16px; color: #444; margin-bottom: 15px; }
+
+        .filter-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .filter-row select { width: 200px; }
+        .filter-row input { flex-grow: 1; }
+        .remove-filter { background: #fee; color: var(--danger); padding: 8px 12px; }
+
+        /* Chart Container */
+        .chart-wrapper {
+            display: flex; gap: 20px; align-items: stretch;
+            background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee;
+            flex-wrap: wrap;
+        }
+        .chart-controls { 
+            display: flex; flex-direction: column; gap: 8px; min-width: 250px; 
+            border-right: 1px solid #eee; padding-right: 20px; flex: 1;
+        }
+        .canvas-container { position: relative; height: 300px; width: 100%; max-width: 500px; flex: 2; display: flex; justify-content: center; align-items: center;}
+
+        /* Image Downloader Styles */
+        .img-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .img-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            background: #f9f9f9;
+        }
+        .img-card img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 5px;
+        }
+        .img-card span {
+            font-size: 12px;
+            font-weight: 600;
+            display: block;
+            word-break: break-all;
+            color: #444;
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto; border-radius: 8px; border: 1px solid #eee; background: #fff;
+            max-height: 550px; margin-bottom: 20px;
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
+        th, td { padding: 12px 16px; border-bottom: 1px solid #eee; font-size: 13px; position: relative; }
+        th { background-color: #f8f9fa; color: #555; font-weight: 600; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); }
+        tr:hover { background-color: var(--secondary-bg); }
+
+        .profile-img { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #ddd; cursor: pointer; transition: transform 0.2s ease; }
+        .profile-img:hover { transform: scale(1.5); box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 100; position: relative; }
+        .empty-state { text-align: center; padding: 40px; color: #666; font-style: italic; }
+
+        /* Quick Copy Tooltip */
+        .copy-btn {
+            background: none; border: none; cursor: pointer; opacity: 0; font-size: 14px;
+            transition: opacity 0.2s; position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+        }
+        td:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { transform: translateY(-50%) scale(1.2); }
+
+        .pagination-controls { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; display: none; }
+        .page-info { font-size: 14px; color: #555; font-weight: 500; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        
+        /* Toast Notification */
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center;
+            border-radius: 8px; padding: 12px; position: fixed; z-index: 1000; left: 50%; bottom: 30px;
+            transform: translateX(-50%); font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+        @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
+
+        .control-section {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
         }
     </style>
 </head>
 <body>
 
-    <!-- Strict Workflow Wizard -->
-    <div id="wizard-container">
-        <!-- Step 1: Compliance Timer -->
-        <div id="step1" class="wizard-step active">
-            <h3>STEP 1: SECURITY PROTOCOL</h3>
-            <p>Initializing secure workspace. Please review compliance guidelines before proceeding.</p>
-            <p style="font-size: 12px; color: #aaa; margin-bottom: 30px;">Unauthorized access is strictly prohibited. All poster generation activity is logged.</p>
-            <button id="btn-step1" disabled>Awaiting Verification... (<span id="timer">8</span>s)</button>
+    <div class="glass-panel">
+        <div class="header-controls">
+            <h2>Student Data Master</h2>
+            <div class="input-group">
+                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv">
+                <span id="statusBadge" class="status-badge">File Loaded</span>
+            </div>
         </div>
 
-        <!-- Step 2: Manual Typing Confirmation -->
-        <div id="step2" class="wizard-step">
-            <h3>STEP 2: DATA VALIDATION AGREEMENT</h3>
-            <p>Before generating bulk files, you must confirm that your CSV strictly follows the required format.</p>
-            <p style="font-size: 12px; color: #ffeb3b; margin-bottom: 20px;">Type <strong>I AGREE</strong> in the box below to authorize processing.</p>
-            <input type="text" id="confirm-text" class="wizard-input" placeholder="Type I AGREE here" autocomplete="off" />
-            <br>
-            <button onclick="checkStep2()">Validate & Enter Workspace</button>
+        <div class="toolbar">
+            <input type="text" id="searchInput" class="global-search" placeholder="Quick Search (Any column)..." disabled>
+            <button id="searchBtn" disabled>🔍 Search</button>
+            <button id="toggleFiltersBtn" class="btn-outline" disabled>⚙️ Filters</button>
+            <button id="toggleDuplicatesBtn" class="btn-outline" disabled>👯 Duplicates</button>
+            <button id="toggleChartBtn" class="btn-outline" disabled>📊 Analytics</button>
+            <button id="toggleImageDownloaderBtn" class="btn-outline" disabled>🖼️ Image Downloader</button>
+            <button id="exportBtn" class="btn-success" disabled>📥 Export CSV</button>
+            <button id="resetBtn" class="btn-outline" style="display:none;">🔄 Reset View</button>
         </div>
-    </div>
 
-    <!-- Control Panel -->
-    <div id="controls">
-        <div class="control-group">
-            <label style="font-size: 11px; font-weight: 800;">1. STUDENT CSV</label>
-            <input type="file" id="csvFileInput" accept=".csv" />
+        <div id="filtersPanel" class="tools-panel">
+            <h3>Custom Multi-Filters (Applies to Table & Export)</h3>
+            <div id="filterRowsContainer"></div>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button onclick="addFilterRow()" class="btn-outline">+ Add Condition</button>
+                <button onclick="applyAdvancedFilters()">Apply Filters</button>
+            </div>
         </div>
-        <button onclick="startProcessingWithDelay()">Generate Boards</button>
-        <button id="editToggleBtn" class="btn-edit" onclick="toggleEditMode()">Enable Edit Mode</button>
-        <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
-        
-        <div style="display: flex; gap: 5px; align-items: center; background: #333; padding: 4px; border-radius: 5px;">
-            <input type="text" id="pageDownloadInput" placeholder="Page (e.g. 1 or all)" value="all" style="width: 130px; margin: 0; background: #222; border: none; text-align: center;" />
-            <button class="btn-download" onclick="downloadImages()" style="margin: 0;">Download HD</button>
+
+        <div id="duplicatesPanel" class="tools-panel">
+            <h3>Find Duplicate Records</h3>
+            <div class="input-group">
+                <label>Check for duplicates in column: </label>
+                <select id="duplicateColumnSelect"></select>
+                <button onclick="findDuplicates()" class="btn-danger">Scan for Duplicates</button>
+            </div>
         </div>
-    </div>
 
-    <div id="editToolbar">
-        <div style="font-size: 14px; font-weight: 800; margin-bottom: 10px; color: #ea5c15;">EDIT MODE ACTIVE</div>
-        <div style="font-size: 12px; margin-bottom: 15px; max-width: 200px; margin-left: auto; margin-right: auto;">
-            Click any text on the boards to type. Use the buttons below to resize selected text.
+        <div id="chartPanel" class="tools-panel">
+            <h3>Visual Data Breakdown</h3>
+            <div class="chart-wrapper">
+                <div class="chart-controls">
+                    <div class="control-section">
+                        <label style="font-weight: 600; font-size: 13px; color: #555;">1. Analyze Slices By:</label>
+                        <select id="chartColumnSelect" onchange="generateChart()" style="width: 100%; margin-top: 5px;"></select>
+                    </div>
+                    
+                    <div class="control-section" style="margin-top: 5px;">
+                        <label style="font-weight: 600; font-size: 13px; color: #555;">2. Filter Analytics Data (Optional):</label>
+                        <select id="chartFilterColumn" onchange="updateChartFilterValues()" style="width: 100%; margin-top: 5px; margin-bottom: 5px;">
+                            <option value="">-- Select Column to Filter --</option>
+                        </select>
+                        <select id="chartFilterValue" onchange="generateChart()" style="width: 100%;">
+                            <option value="">-- Show All --</option>
+                        </select>
+                    </div>
+
+                    <button onclick="generateChart()" class="btn-outline" style="margin-top: 10px; justify-content: center;">🔄 Refresh Chart</button>
+                    <small style="color:#666; margin-top:5px; text-align: center;">Hover over sections for exact numbers.</small>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="analyticsChart"></canvas>
+                    <div id="noDataMessage" style="display: none; color: #888; font-style: italic;">No data matches the selected filter.</div>
+                </div>
+            </div>
         </div>
-        <div>
-            <button class="toolbar-btn" onclick="resizeFocusedText(-1)">A -</button>
-            <button class="toolbar-btn" onclick="resizeFocusedText(1)">A +</button>
-        </div>
-    </div>
 
-    <div id="loadingOverlay">
-        <div id="loadingMessage">Generating HD Images...</div>
-        <div style="font-size: 14px; margin-top: 10px; font-weight: 400; color: #ccc;" id="loadingSubMessage">Please wait, this may take a moment.</div>
-    </div>
-
-    <div id="output"></div>
-
-    <script>
-        let currentBgImage = "url('https://ik.imagekit.io/7pu8xl7bt/aman%20temp.png')";
-        let isEditMode = false;
-        let focusedElement = null;
-
-        // --- WIZARD LOGIC ---
-        let timeLeft = 8;
-        const timerSpan = document.getElementById('timer');
-        const btnStep1 = document.getElementById('btn-step1');
-        
-        const countdown = setInterval(() => {
-            timeLeft--;
-            timerSpan.innerText = timeLeft;
-            if (timeLeft <= 0) {
-                clearInterval(countdown);
-                btnStep1.innerText = "Acknowledge & Proceed";
-                btnStep1.disabled = false;
-                btnStep1.onclick = () => {
-                    document.getElementById('step1').classList.remove('active');
-                    document.getElementById('step2').classList.add('active');
-                };
-            }
-        }, 1000);
-
-        function checkStep2() {
-            const input = document.getElementById('confirm-text').value;
-            if (input === "I AGREE") {
-                document.getElementById('wizard-container').style.display = 'none';
-            } else {
-                alert("Validation Failed. You must type exactly 'I AGREE' (case-sensitive) to proceed.");
-            }
-        }
-
-        // --- CORE LOGIC ---
-        document.addEventListener('focusin', function(e) {
-            if (isEditMode && e.target.classList.contains('editable-text')) {
-                focusedElement = e.target;
-            }
-        });
-
-        function toggleEditMode() {
-            const btn = document.getElementById('editToggleBtn');
-            const toolbar = document.getElementById('editToolbar');
-            const editableTexts = document.querySelectorAll('.editable-text');
-            
-            isEditMode = !isEditMode;
-            
-            if (isEditMode) {
-                btn.classList.add('active');
-                btn.innerText = "Disable Edit Mode";
-                toolbar.style.display = "block";
-                editableTexts.forEach(el => el.setAttribute('contenteditable', 'true'));
-            } else {
-                btn.classList.remove('active');
-                btn.innerText = "Enable Edit Mode";
-                toolbar.style.display = "none";
-                editableTexts.forEach(el => el.setAttribute('contenteditable', 'false'));
-                focusedElement = null;
-            }
-        }
-
-        function resizeFocusedText(direction) {
-            if (!focusedElement) {
-                alert("Please click on the text you want to resize first.");
-                return;
-            }
-            
-            let currentSize = window.getComputedStyle(focusedElement).fontSize;
-            let currentSizeNum = parseFloat(currentSize);
-            focusedElement.style.fontSize = (currentSizeNum + direction) + 'px';
-        }
-
-        function parseCSVRow(str) {
-            const arr = [];
-            let quote = false;
-            let val = '';
-            for (let c = 0; c < str.length; c++) {
-                let char = str[c], nextChar = str[c+1];
-                if (char === '"' && quote && nextChar === '"') {
-                    val += '"';
-                    c++;
-                } else if (char === '"') {
-                    quote = !quote;
-                } else if (char === ',' && !quote) {
-                    arr.push(val);
-                    val = '';
-                } else {
-                    val += char;
-                }
-            }
-            arr.push(val);
-            return arr.map(v => v.trim());
-        }
-
-        // --- FAKE PROCESSING DELAY ---
-        function startProcessingWithDelay() {
-            const fileInput = document.getElementById('csvFileInput');
-            if (fileInput.files.length === 0) {
-                alert("STRICT ERROR: Please select a valid CSV file first.");
-                return;
-            }
-
-            const overlay = document.getElementById('loadingOverlay');
-            document.getElementById('loadingMessage').innerText = "Running Data Integrity Check...";
-            document.getElementById('loadingSubMessage').innerText = "Validating row headers and matrix indexing (Est: 4 seconds)";
-            overlay.style.display = 'flex';
-
-            setTimeout(() => {
-                overlay.style.display = 'none';
-                processCSV();
-            }, 4000); // Forces a 4 second wait
-        }
-
-        function processCSV() {
-            const fileInput = document.getElementById('csvFileInput');
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                const text = e.target.result.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                const rows = text.split('\n');
+        <!-- NEW IMAGE DOWNLOADER PANEL -->
+        <div id="imageDownloaderPanel" class="tools-panel">
+            <h3>Bulk Profile Image Extractor & Downloader</h3>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #555;">1. Select ID / Enrollment Column:</label>
+                    <select id="idColumnSelect" style="width: 100%; margin-top: 5px; margin-bottom: 10px;"></select>
+                    
+                    <label style="font-size: 13px; font-weight: 600; color: #555;">2. Select Image URL Column:</label>
+                    <select id="imageColumnSelect" style="width: 100%; margin-top: 5px; margin-bottom: 10px;"></select>
+                    
+                    <label style="font-size: 13px; font-weight: 600; color: #555;">3. Paste Enrollment IDs / Roll Numbers:</label>
+                    <textarea id="pastedIds" rows="5" style="width: 100%; margin-top: 5px;" placeholder="Paste IDs separated by lines, spaces, or commas...&#10;e.g.&#10;1001&#10;1002&#10;1003"></textarea>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button onclick="fetchImagesByIDs()">🔍 Find Images</button>
+                        <button id="downloadZipBtn" class="btn-success" onclick="downloadImagesZip()" disabled>📦 Download All as ZIP</button>
+                    </div>
+                </div>
                 
-                while(rows.length > 0 && rows[rows.length - 1].trim() === '') rows.pop();
-
-                if (rows.length < 2) {
-                    alert("STRICT ERROR: The CSV file seems to be empty or missing data.");
-                    return;
-                }
-
-                const headers = parseCSVRow(rows[0]);
-
-                const nameIdx = headers.indexOf('Student Name');
-                const courseIdx = headers.indexOf('Course');
-                const uniIdx = headers.indexOf('University / College');
-                const centerIdx = headers.indexOf('Center');
-                const enrollIdx = headers.indexOf('Enrollment ID');
-                const rankIdx = headers.indexOf('Rank');
-
-                if (nameIdx === -1 || enrollIdx === -1) {
-                    alert("STRICT ERROR: Could not find required columns in CSV (Make sure 'Student Name' and 'Enrollment ID' exist exactly as written).");
-                    return;
-                }
-
-                let students = [];
-                for (let i = 1; i < rows.length; i++) {
-                    const rowText = rows[i];
-                    if (rowText.trim() === '' || rowText.replace(/,/g, '').trim() === '') continue; 
-                    
-                    const cols = parseCSVRow(rowText);
-                    
-                    const parsedName = cols[nameIdx] ? cols[nameIdx].trim() : '';
-                    if (parsedName === '') continue;
-                    
-                    students.push({
-                        name: parsedName,
-                        enrollment: cols[enrollIdx] || '',
-                        center: cols[centerIdx] || '',
-                        course: cols[courseIdx] || '',
-                        university: cols[uniIdx] || '',
-                        rank: rankIdx !== -1 ? (cols[rankIdx] || '') : '' 
-                    });
-                }
-
-                students.sort((a, b) => {
-                    const valA = a.rank.trim().toLowerCase();
-                    const valB = b.rank.trim().toLowerCase();
-
-                    function getSortCategory(val) {
-                        if (val === "" || val === "na") return 3; 
-                        if (val === "selected") return 2; 
-                        
-                        const num = parseInt(val.replace(/\D/g, ''), 10);
-                        if (!isNaN(num)) return 1; 
-                        
-                        return 3; 
-                    }
-
-                    const catA = getSortCategory(valA);
-                    const catB = getSortCategory(valB);
-
-                    if (catA !== catB) {
-                        return catA - catB;
-                    }
-
-                    if (catA === 1 && catB === 1) {
-                        const numA = parseInt(valA.replace(/\D/g, ''), 10);
-                        const numB = parseInt(valB.replace(/\D/g, ''), 10);
-                        return numA - numB;
-                    }
-
-                    return 0; 
-                });
-
-                generatePosters(students);
-            };
-
-            reader.readAsText(file);
-        }
-
-        function generatePosters(students) {
-            const outputDiv = document.getElementById('output');
-            outputDiv.innerHTML = ''; 
-            
-            if(isEditMode) toggleEditMode();
-
-            for (let i = 0; i < students.length; i += 12) {
-                const chunk = students.slice(i, i + 12);
-                const posterNode = createPosterElement(chunk, Math.floor(i / 12) + 1);
-                outputDiv.appendChild(posterNode);
-            }
-
-            setTimeout(autoResizeText, 100);
-        }
-
-        function createPosterElement(studentsBatch, pageNumber) {
-            const container = document.createElement('div');
-            container.className = 'poster-container';
-            container.id = `poster-page-${pageNumber}`;
-            container.style.backgroundImage = currentBgImage;
-
-            const grid = document.createElement('div');
-            grid.className = 'card-grid';
-
-            studentsBatch.forEach((student) => {
-                const cardHtml = `
-                    <div class="card">
-                        <div class="photo"></div>
-                        
-                        <div class="name-container">
-                            <span class="name auto-fit-text editable-text">${student.name}</span>
-                        </div>
-                        
-                        <div class="details-box">
-                            <div class="detail-col border-right">
-                                <span class="label">ENROLLMENT</span>
-                                <span class="value editable-text">${student.enrollment || '-'}</span>
-                            </div>
-                            <div class="detail-col">
-                                <span class="label">CENTRE</span>
-                                <span class="value editable-text">${student.center || '-'}</span>
-                            </div>
-                        </div>
-                        
-                        <div class="course-container">
-                            <span class="course auto-fit-text editable-text">${student.course || '-'}</span>
-                        </div>
-
-                        <div class="university-container">
-                            <span class="university auto-fit-text editable-text">${student.university || '-'}</span>
+                <div style="flex: 2; min-width: 300px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #555;">Found Images Preview (<span id="foundImgCount">0</span>):</label>
+                    <div id="imagePreviewContainer" class="img-grid">
+                        <div style="grid-column: 1 / -1; text-align: center; color: #888; padding: 20px;">
+                            Paste IDs and click "Find Images" to generate preview.
                         </div>
                     </div>
-                `;
-                
-                grid.insertAdjacentHTML('beforeend', cardHtml);
-            });
+                </div>
+            </div>
+        </div>
 
-            container.appendChild(grid);
-            return container;
-        }
+        <div class="table-container">
+            <table id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="100%" class="empty-state">Upload an Excel/CSV file to begin exploring.</td></tr>
+                </tbody>
+            </table>
+        </div>
 
-        function autoResizeText() {
-            const textElements = document.querySelectorAll('.auto-fit-text');
-            
-            textElements.forEach(el => {
-                const parent = el.parentElement;
-                let fontSize = parseFloat(window.getComputedStyle(el).fontSize);
-                const minFontSize = 10; 
-                
-                while ((el.scrollWidth > parent.clientWidth || el.scrollHeight > parent.clientHeight) && fontSize > minFontSize) {
-                    fontSize -= 0.5;
-                    el.style.fontSize = fontSize + 'px';
+        <div id="paginationContainer" class="pagination-controls">
+            <button id="prevBtn" onclick="changePage(-1)">← Previous</button>
+            <span id="pageInfo" class="page-info">Showing 0 of 0</span>
+            <button id="nextBtn" onclick="changePage(1)">Next →</button>
+        </div>
+    </div>
+
+    <div id="toast">Copied to clipboard!</div>
+
+    <script>
+        let globalData = []; 
+        let globalHeaders = [];
+        let currentFilteredData = [];
+        let currentPage = 1;
+        const rowsPerPage = 100;
+        let chartInstance = null;
+        let matchedImagesList = []; // Holds items for bulk image zip download
+
+        // Panel Toggles
+        function togglePanel(panelId) {
+            const panels = ['filtersPanel', 'duplicatesPanel', 'chartPanel', 'imageDownloaderPanel'];
+            panels.forEach(id => {
+                const el = document.getElementById(id);
+                if(id === panelId) {
+                    el.style.display = el.style.display === 'block' ? 'none' : 'block';
+                    if(id === 'chartPanel' && el.style.display === 'block') generateChart();
+                } else {
+                    el.style.display = 'none';
                 }
             });
         }
 
-        async function downloadImages() {
-            const allContainers = Array.from(document.querySelectorAll('.poster-container'));
-            if (allContainers.length === 0) {
-                alert("STRICT ERROR: Please generate the boards first.");
+        document.getElementById('toggleFiltersBtn').addEventListener('click', () => togglePanel('filtersPanel'));
+        document.getElementById('toggleDuplicatesBtn').addEventListener('click', () => togglePanel('duplicatesPanel'));
+        document.getElementById('toggleChartBtn').addEventListener('click', () => togglePanel('chartPanel'));
+        document.getElementById('toggleImageDownloaderBtn').addEventListener('click', () => togglePanel('imageDownloaderPanel'));
+
+        // Reset All
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterRowsContainer').innerHTML = '';
+            addFilterRow(); 
+            currentFilteredData = [...globalData];
+            currentPage = 1;
+            updateView();
+            document.getElementById('resetBtn').style.display = 'none';
+            
+            // Reset Chart filters
+            document.getElementById('chartFilterColumn').value = '';
+            updateChartFilterValues();
+            if(document.getElementById('chartPanel').style.display === 'block') generateChart();
+        });
+
+        // 1. File Upload Logic
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="100%" class="empty-state">Processing file...</td></tr>';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                globalData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval: ""});
+                
+                if(globalData.length > 0) {
+                    globalHeaders = Object.keys(globalData[0]);
+                    populateDropdowns();
+                }
+
+                // Enable UI Buttons
+                ['searchInput', 'searchBtn', 'toggleFiltersBtn', 'toggleDuplicatesBtn', 'toggleChartBtn', 'toggleImageDownloaderBtn', 'exportBtn'].forEach(id => {
+                    document.getElementById(id).disabled = false;
+                });
+                
+                document.getElementById('statusBadge').style.display = 'inline-block';
+                document.getElementById('statusBadge').innerText = `${globalData.length.toLocaleString()} Records Loaded`;
+                
+                currentFilteredData = [...globalData];
+                currentPage = 1;
+                updateView();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function populateDropdowns() {
+            const dupSelect = document.getElementById('duplicateColumnSelect');
+            const chartSelect = document.getElementById('chartColumnSelect');
+            const chartFilterColSelect = document.getElementById('chartFilterColumn');
+            const idColSelect = document.getElementById('idColumnSelect');
+            const imgColSelect = document.getElementById('imageColumnSelect');
+            
+            dupSelect.innerHTML = '';
+            chartSelect.innerHTML = '';
+            idColSelect.innerHTML = '';
+            imgColSelect.innerHTML = '';
+            chartFilterColSelect.innerHTML = '<option value="">-- Select Column to Filter --</option>';
+            
+            globalHeaders.forEach(header => {
+                dupSelect.add(new Option(header, header));
+                chartSelect.add(new Option(header, header)); 
+                chartFilterColSelect.add(new Option(header, header));
+                idColSelect.add(new Option(header, header));
+                imgColSelect.add(new Option(header, header));
+            });
+            
+            // Smart column detection
+            globalHeaders.forEach(h => {
+                const lower = h.toLowerCase();
+                if(lower.includes('id') || lower.includes('enroll') || lower.includes('roll')) idColSelect.value = h;
+                if(lower.includes('img') || lower.includes('photo') || lower.includes('image') || lower.includes('pic') || lower.includes('url')) imgColSelect.value = h;
+            });
+
+            // Set intelligent defaults for the chart if columns exist
+            const possibleChartCols = ['Course', 'School', 'Year', 'Categ.'];
+            for(let col of possibleChartCols) {
+                if(globalHeaders.includes(col)) {
+                    chartSelect.value = col;
+                    break;
+                }
+            }
+
+            document.getElementById('filterRowsContainer').innerHTML = '';
+            addFilterRow();
+        }
+
+        // --- FILTERING & SEARCH ---
+        function addFilterRow() {
+            const container = document.getElementById('filterRowsContainer');
+            const row = document.createElement('div');
+            row.className = 'filter-row';
+            let optionsHTML = globalHeaders.map(h => `<option value="${h}">${h}</option>`).join('');
+            row.innerHTML = `
+                <select class="col-select">${optionsHTML}</select>
+                <select class="op-select">
+                    <option value="includes">Contains</option>
+                    <option value="equals">Exact Match</option>
+                    <option value="not">Does Not Contain</option>
+                </select>
+                <input type="text" class="val-input" placeholder="Value...">
+                <button class="remove-filter" onclick="this.parentElement.remove()" title="Remove Rule">X</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function applyAdvancedFilters() {
+            const rows = document.querySelectorAll('.filter-row');
+            let results = [...globalData];
+
+            rows.forEach(row => {
+                const col = row.querySelector('.col-select').value;
+                const op = row.querySelector('.op-select').value;
+                const val = row.querySelector('.val-input').value.toLowerCase().trim();
+
+                if (!val) return; 
+
+                results = results.filter(item => {
+                    const cellVal = String(item[col] || '').toLowerCase();
+                    if (op === 'includes') return cellVal.includes(val);
+                    if (op === 'equals') return cellVal === val;
+                    if (op === 'not') return !cellVal.includes(val);
+                });
+            });
+
+            triggerViewUpdate(results);
+        }
+
+        function performSearch() {
+            const term = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (!term) return;
+
+            const results = globalData.filter(row => 
+                Object.values(row).some(value => String(value).toLowerCase().includes(term))
+            );
+            triggerViewUpdate(results);
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', e => { if(e.key === 'Enter') performSearch(); });
+
+        // --- DUPLICATES ---
+        function findDuplicates() {
+            const col = document.getElementById('duplicateColumnSelect').value;
+            const counts = {};
+            globalData.forEach(row => {
+                const val = row[col];
+                if(val) counts[val] = (counts[val] || 0) + 1;
+            });
+
+            let results = globalData.filter(row => {
+                const val = row[col];
+                return val && counts[val] > 1;
+            });
+
+            results.sort((a, b) => String(a[col]).localeCompare(String(b[col])));
+            triggerViewUpdate(results);
+        }
+
+        function triggerViewUpdate(newData) {
+            currentFilteredData = newData;
+            currentPage = 1;
+            document.getElementById('resetBtn').style.display = 'block';
+            updateView();
+            updateChartFilterValues(); 
+            if(document.getElementById('chartPanel').style.display === 'block') generateChart();
+        }
+
+        // --- BULK IMAGE EXTRACTION & DOWNLOAD LOGIC ---
+        function fetchImagesByIDs() {
+            const rawText = document.getElementById('pastedIds').value;
+            const idCol = document.getElementById('idColumnSelect').value;
+            const imgCol = document.getElementById('imageColumnSelect').value;
+            
+            if(!rawText.trim()) { alert("Please paste at least one ID."); return; }
+            if(!idCol || !imgCol) { alert("Please select both ID and Image columns."); return; }
+
+            // Split IDs by newlines, commas, or spaces and clean up
+            const requestedIDs = rawText.split(/[\n,\s]+/).map(s => s.trim()).filter(s => s.length > 0);
+            const lookupMap = {};
+            
+            // Build fast lookup map from Excel data
+            globalData.forEach(row => {
+                if(row[idCol] !== undefined && row[idCol] !== null) {
+                    const idKey = String(row[idCol]).trim().toLowerCase();
+                    lookupMap[idKey] = String(row[imgCol]).trim();
+                }
+            });
+
+            matchedImagesList = [];
+            const container = document.getElementById('imagePreviewContainer');
+            container.innerHTML = '';
+
+            requestedIDs.forEach(id => {
+                const targetIdKey = id.toLowerCase();
+                const imageUrl = lookupMap[targetIdKey];
+
+                if(imageUrl && imageUrl.startsWith('http')) {
+                    matchedImagesList.push({ id: id, url: imageUrl });
+                    
+                    const card = document.createElement('div');
+                    card.className = 'img-card';
+                    card.innerHTML = `
+                        <img src="${imageUrl}" alt="${id}" onerror="this.src='https://via.placeholder.com/100?text=Error'">
+                        <span>${id}</span>
+                    `;
+                    container.appendChild(card);
+                }
+            });
+
+            document.getElementById('foundImgCount').innerText = matchedImagesList.length;
+            document.getElementById('downloadZipBtn').disabled = matchedImagesList.length === 0;
+
+            if(matchedImagesList.length === 0) {
+                container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--danger); padding: 20px;">No matching images found for the entered IDs. Check your column choices and pasted text.</div>`;
+            }
+        }
+
+        async function downloadImagesZip() {
+            if(matchedImagesList.length === 0) return;
+
+            const downloadBtn = document.getElementById('downloadZipBtn');
+            const originalText = downloadBtn.innerText;
+            downloadBtn.innerText = '⏳ Downloading & Packing...';
+            downloadBtn.disabled = true;
+
+            const zip = new JSZip();
+            const folder = zip.folder("student_images");
+
+            for(let i = 0; i < matchedImagesList.length; i++) {
+                const item = matchedImagesList[i];
+                try {
+                    const response = await fetch(item.url);
+                    const blob = await response.blob();
+                    
+                    // Determine file extension
+                    let ext = 'jpg';
+                    if(blob.type.includes('png')) ext = 'png';
+                    else if(blob.type.includes('webp')) ext = 'webp';
+                    else if(blob.type.includes('gif')) ext = 'gif';
+                    
+                    // Save as [ID].[extension]
+                    folder.file(`${item.id}.${ext}`, blob);
+                } catch(err) {
+                    console.error(`Failed to fetch image for ID: ${item.id}`, err);
+                }
+            }
+
+            zip.generateAsync({type:"blob"}).then(function(content) {
+                saveAs(content, "student_images.zip");
+                downloadBtn.innerText = originalText;
+                downloadBtn.disabled = false;
+            });
+        }
+
+        // --- EXPORT CSV ---
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if(currentFilteredData.length === 0) { alert("No data to export."); return; }
+            
+            const ws = XLSX.utils.json_to_sheet(currentFilteredData);
+            const csv = XLSX.utils.sheet_to_csv(ws);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Filtered_Student_Data.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // --- COPY TO CLIPBOARD ---
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const toast = document.getElementById("toast");
+                toast.innerText = `Copied: ${text}`;
+                toast.className = "show";
+                setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+            });
+        }
+
+        // --- ANALYTICS CHART & FILTERS ---
+        function updateChartFilterValues() {
+            const filterCol = document.getElementById('chartFilterColumn').value;
+            const valSelect = document.getElementById('chartFilterValue');
+            
+            valSelect.innerHTML = '<option value="">-- Show All --</option>';
+            
+            if(!filterCol) {
+                generateChart();
                 return;
             }
 
-            const pageInput = document.getElementById('pageDownloadInput').value.trim().toLowerCase();
-            let targets = [];
+            const uniqueValues = [...new Set(currentFilteredData.map(row => row[filterCol]))]
+                                 .filter(val => val !== undefined && val !== "");
+            
+            uniqueValues.sort((a, b) => isNaN(a) || isNaN(b) ? String(a).localeCompare(String(b)) : a - b);
+            
+            uniqueValues.forEach(val => {
+                valSelect.add(new Option(val, val));
+            });
+            
+            generateChart();
+        }
 
-            if (pageInput === 'all') {
-                targets = allContainers;
+        function generateChart() {
+            if(currentFilteredData.length === 0) return;
+            
+            let dataToAnalyze = [...currentFilteredData];
+            
+            const filterCol = document.getElementById('chartFilterColumn').value;
+            const filterVal = document.getElementById('chartFilterValue').value;
+            
+            if (filterCol && filterVal) {
+                dataToAnalyze = dataToAnalyze.filter(row => String(row[filterCol]) === String(filterVal));
+            }
+
+            const canvas = document.getElementById('analyticsChart');
+            const noDataMsg = document.getElementById('noDataMessage');
+
+            if(chartInstance) chartInstance.destroy(); 
+
+            if(dataToAnalyze.length === 0) {
+                canvas.style.display = 'none';
+                noDataMsg.style.display = 'block';
+                return;
             } else {
-                const pageNum = parseInt(pageInput, 10);
-                if (isNaN(pageNum) || pageNum < 1 || pageNum > allContainers.length) {
-                    alert(`STRICT ERROR: Invalid page number. Please enter a number between 1 and ${allContainers.length}, or 'all'.`);
-                    return;
+                canvas.style.display = 'block';
+                noDataMsg.style.display = 'none';
+            }
+
+            const col = document.getElementById('chartColumnSelect').value;
+            const counts = {};
+            
+            dataToAnalyze.forEach(row => {
+                let val = row[col] || 'Unknown';
+                if(String(val).length > 25) val = String(val).substring(0, 25) + '...';
+                counts[val] = (counts[val] || 0) + 1;
+            });
+
+            const sortedEntries = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            const labels = sortedEntries.map(e => e[0]);
+            const dataVals = sortedEntries.map(e => e[1]);
+
+            const ctx = canvas.getContext('2d');
+            
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Number of Students',
+                        data: dataVals,
+                        backgroundColor: [
+                            '#00796B', '#004D40', '#4DB6AC', '#80CBC4', '#26A69A', 
+                            '#00695C', '#00897B', '#B2DFDB', '#E0F2F1', '#333333'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
                 }
-                targets = [allContainers[pageNum - 1]];
+            });
+        }
+
+        // --- RENDER & PAGINATION ---
+        function changePage(direction) {
+            currentPage += direction;
+            updateView();
+            document.querySelector('.table-container').scrollTop = 0;
+        }
+
+        function updateView() {
+            const tableHead = document.getElementById('tableHead');
+            const tableBody = document.getElementById('tableBody');
+            const paginationContainer = document.getElementById('paginationContainer');
+            
+            tableHead.innerHTML = ''; tableBody.innerHTML = '';
+
+            const totalResults = currentFilteredData.length;
+
+            if (totalResults === 0) {
+                tableBody.innerHTML = '<tr><td colspan="100%" class="empty-state">No records found. Try adjusting your search.</td></tr>';
+                paginationContainer.style.display = 'none';
+                return;
             }
 
-            if (isEditMode) {
-                toggleEditMode();
-            }
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalResults);
+            const pageData = currentFilteredData.slice(startIndex, endIndex);
 
-            window.scrollTo(0, 0);
-            await document.fonts.ready;
+            const headerRow = document.createElement('tr');
+            globalHeaders.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
 
-            const overlay = document.getElementById('loadingOverlay');
-            document.getElementById('loadingMessage').innerText = "Generating HD Images...";
-            document.getElementById('loadingSubMessage').innerText = "Compiling high-resolution assets. Please wait.";
-            overlay.style.display = 'flex';
+            pageData.forEach(rowData => {
+                const row = document.createElement('tr');
+                globalHeaders.forEach(header => {
+                    const cell = document.createElement('td');
+                    const cellValue = rowData[header] !== undefined ? rowData[header] : '';
 
-            for (let i = 0; i < targets.length; i++) {
-                const container = targets[i];
-                const actualPageNum = container.id.replace('poster-page-', '');
-                
-                try {
-                    const highResCanvas = await html2canvas(container, {
-                        scale: 2, 
-                        useCORS: true, 
-                        allowTaint: true,
-                        backgroundColor: "#0b1e4c",
-                        logging: false
-                    });
-                    
-                    const finalCanvas = document.createElement('canvas');
-                    finalCanvas.width = 1414;
-                    finalCanvas.height = 2000;
-                    
-                    const ctx = finalCanvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                    ctx.drawImage(highResCanvas, 0, 0, 1414, 2000);
-                    
-                    const link = document.createElement('a');
-                    link.download = `Student_Rankers_Page_${actualPageNum}.png`;
-                    link.href = finalCanvas.toDataURL('image/png', 1.0);
-                    link.click();
-                    
-                    await new Promise(resolve => setTimeout(resolve, 500)); 
-                } catch (err) {
-                    console.error("Error generating image: ", err);
-                }
-            }
+                    const isImageUrl = typeof cellValue === 'string' && 
+                                       (cellValue.startsWith('http')) && 
+                                       (cellValue.match(/\.(jpeg|jpg|gif|png)$/i) != null || header.toLowerCase().includes('url'));
 
-            document.getElementById('loadingOverlay').style.display = 'none';
-            alert("Secure Download Complete!");
+                    if (isImageUrl) {
+                        cell.innerHTML = `<img src="${cellValue}" class="profile-img" alt="Profile" onclick="window.open('${cellValue}', '_blank')">`;
+                    } else {
+                        const cleanValue = String(cellValue).replace(/'/g, "\\'"); 
+                        cell.innerHTML = `
+                            ${cellValue}
+                            ${cellValue ? `<button class="copy-btn" onclick="copyToClipboard('${cleanValue}')" title="Copy">📋</button>` : ''}
+                        `;
+                    }
+                    row.appendChild(cell);
+                });
+                tableBody.appendChild(row);
+            });
+
+            paginationContainer.style.display = 'flex';
+            document.getElementById('pageInfo').innerText = `Showing ${startIndex + 1} - ${endIndex} of ${totalResults} results`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = endIndex >= totalResults;
         }
     </script>
 </body>
